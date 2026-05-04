@@ -22,11 +22,20 @@
         button { background: #0984e3; border: none; color: white; padding: 5px 12px; border-radius: 20px; cursor: pointer; margin-top: 5px; }
         input { padding: 5px; border-radius: 8px; border: 1px solid #ccc; margin-top: 5px; width: 90%; }
         
-        .share-location-btn {
+        .balloon-marker { background: transparent; width: 36px; height: 36px; text-align: center; font-weight: bold; font-size: 12px; color: white; position: relative; }
+        .balloon-marker .pin { width: 32px; height: 32px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.3); position: absolute; top: 0; left: 2px; }
+        .balloon-marker .pin .number { transform: rotate(45deg); font-weight: bold; font-size: 11px; color: white; text-shadow: 0 0 1px black; }
+        .balloon-marker .pin::after { content: ''; position: absolute; bottom: -5px; left: 12px; width: 6px; height: 6px; background: rgba(255,255,255,0.8); border-radius: 50%; }
+        
+        .layer-control { position: absolute; top: 10px; right: 10px; background: rgba(255,255,255,0.95); padding: 8px 12px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); z-index: 1000; display: flex; gap: 8px; direction: ltr; border: 1px solid #ddd; }
+        .layer-control button { background: #2c3e50; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+        .layer-control button.active { background: #3498db; }
+        
+        .my-location-btn {
             position: absolute;
             bottom: 20px;
-            left: 10px;
-            background: #27ae60;
+            right: 10px;
+            background: #3498db;
             padding: 8px 12px;
             border-radius: 30px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.2);
@@ -39,20 +48,15 @@
             display: flex;
             align-items: center;
             gap: 5px;
+            transition: 0.2s;
         }
-        .share-location-btn.sharing { background: #e74c3c; }
-        .share-location-btn:hover { opacity: 0.9; }
+        .my-location-btn.sharing {
+            background: #e74c3c;
+        }
+        .my-location-btn:hover {
+            opacity: 0.9;
+        }
         
-        .balloon-marker { background: transparent; width: 36px; height: 36px; text-align: center; font-weight: bold; font-size: 12px; color: white; position: relative; }
-        .balloon-marker .pin { width: 32px; height: 32px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.3); position: absolute; top: 0; left: 2px; }
-        .balloon-marker .pin .number { transform: rotate(45deg); font-weight: bold; font-size: 11px; color: white; text-shadow: 0 0 1px black; }
-        .balloon-marker .pin::after { content: ''; position: absolute; bottom: -5px; left: 12px; width: 6px; height: 6px; background: rgba(255,255,255,0.8); border-radius: 50%; }
-        
-        .layer-control { position: absolute; top: 10px; right: 10px; background: rgba(255,255,255,0.95); padding: 8px 12px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); z-index: 1000; display: flex; gap: 8px; direction: ltr; border: 1px solid #ddd; }
-        .layer-control button { background: #2c3e50; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
-        .layer-control button.active { background: #3498db; }
-        .my-location-btn { position: absolute; bottom: 20px; right: 10px; background: #fff; padding: 8px 12px; border-radius: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); z-index: 1000; cursor: pointer; font-size: 14px; font-weight: bold; border: none; background-color: #3498db; color: white; display: flex; align-items: center; gap: 5px; }
-        .my-location-btn:hover { background-color: #2980b9; }
         .current-location-marker { background: #4285F4; border: 2px solid white; border-radius: 50%; width: 16px; height: 16px; box-shadow: 0 0 8px rgba(0,0,0,0.3); }
         .current-location-pulse { border-radius: 50%; width: 40px; height: 40px; background: rgba(66, 133, 244, 0.3); animation: pulse 1.5s infinite; }
         @keyframes pulse { 0% { transform: scale(0.5); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
@@ -70,10 +74,9 @@
         <button data-layer="satellite">🛰️ قمر صناعي</button>
         <button data-layer="terrain">⛰️ تضاريس</button>
     </div>
-    <button class="my-location-btn" id="myLocationBtn">📍 موقعي الحالي (لحظي)</button>
-    <button class="share-location-btn" id="shareLocationBtn">📡 مشاركة موقعي المستمرة</button>
+    <button class="my-location-btn" id="myLocationBtn">📍 موقعي الحالي</button>
 </div>
-<div class="info-panel">🧭 اضغط على عداد، أدخل رقم المخالفة (اختياري)، ثم اضغط "تم الإنجاز"<br>📡 زر المشاركة المستمرة يرسل موقعك للمدير كل 10 ثوانٍ</div>
+<div class="info-panel">🧭 اضغط على عداد، أدخل رقم المخالفة (اختياري)، ثم اضغط "تم الإنجاز"<br>📍 الضغط على زر الموقع يشارك موقعك مع المدير بشكل مستمر (يظهر الزر باللون الأحمر عند المشاركة)</div>
 
 <script>
     const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwgqvLQcWxfaVCkvVozWQRnxCByEoRJvppSdgjjG98NQ0SPrxi7ihfbeHnQlOPoYpbe/exec';
@@ -97,70 +100,76 @@
     };
     function switchLayer(layerName) { if (currentTileLayer) map.removeLayer(currentTileLayer); currentTileLayer = tileLayers[layerName]; currentTileLayer.addTo(map); document.querySelectorAll('.layer-control button').forEach(btn => { if (btn.dataset.layer === layerName) btn.classList.add('active'); else btn.classList.remove('active'); }); }
     
-    function showMyLocation() { 
-        if (!navigator.geolocation) { alert("المتصفح لا يدعم تحديد الموقع"); return; } 
-        navigator.geolocation.getCurrentPosition(pos => { 
-            const lat=pos.coords.latitude, lng=pos.coords.longitude; 
-            if(currentLocationMarker) map.removeLayer(currentLocationMarker); 
-            if(currentLocationCircle) map.removeLayer(currentLocationCircle); 
-            const icon = L.divIcon({className:'current-location-marker', iconSize:[16,16], popupAnchor:[0,-8]}); 
-            currentLocationMarker = L.marker([lat,lng],{icon:icon}).addTo(map).bindPopup("📍 أنت هنا").openPopup(); 
-            currentLocationCircle = L.circle([lat,lng], {radius:30, color:'#4285F4', fillColor:'#4285F4', fillOpacity:0.2, weight:1}).addTo(map); 
-            map.setView([lat,lng],15); 
-        }, err => alert(err.message), {enableHighAccuracy:true, timeout:10000}); 
+    // دالة واحدة للموقع الحالي مع المشاركة المستمرة
+    function handleMyLocation() {
+        if (!navigator.geolocation) {
+            alert("المتصفح لا يدعم تحديد الموقع");
+            return;
+        }
+        
+        if (isSharing) {
+            // إيقاف المشاركة
+            if (shareInterval) {
+                clearInterval(shareInterval);
+                shareInterval = null;
+            }
+            isSharing = false;
+            const btn = document.getElementById('myLocationBtn');
+            btn.innerHTML = '📍 موقعي الحالي';
+            btn.classList.remove('sharing');
+            alert('⏹️ تم إيقاف مشاركة الموقع مع المدير');
+        } else {
+            // بدء المشاركة وعرض الموقع الحالي
+            navigator.geolocation.getCurrentPosition(pos => {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                
+                // عرض الموقع على الخريطة
+                if (currentLocationMarker) map.removeLayer(currentLocationMarker);
+                if (currentLocationCircle) map.removeLayer(currentLocationCircle);
+                const icon = L.divIcon({className:'current-location-marker', iconSize:[16,16], popupAnchor:[0,-8]});
+                currentLocationMarker = L.marker([lat,lng], {icon:icon}).addTo(map).bindPopup("📍 أنت هنا (تتم المشاركة)").openPopup();
+                currentLocationCircle = L.circle([lat,lng], {radius:30, color:'#4285F4', fillColor:'#4285F4', fillOpacity:0.2, weight:1}).addTo(map);
+                map.setView([lat,lng], 15);
+                
+                // إرسال الموقع الأول
+                sendLocationToServer(lat, lng);
+                
+                // بدء الإرسال المستمر كل 10 ثوانٍ
+                shareInterval = setInterval(() => {
+                    navigator.geolocation.getCurrentPosition(
+                        pos2 => {
+                            sendLocationToServer(pos2.coords.latitude, pos2.coords.longitude);
+                            // تحديث العلامة على الخريطة
+                            if (currentLocationMarker) {
+                                currentLocationMarker.setLatLng([pos2.coords.latitude, pos2.coords.longitude]);
+                            }
+                            if (currentLocationCircle) {
+                                currentLocationCircle.setLatLng([pos2.coords.latitude, pos2.coords.longitude]);
+                            }
+                        },
+                        err => console.error('خطأ في تحديد الموقع:', err),
+                        {enableHighAccuracy: true}
+                    );
+                }, 10000);
+                
+                isSharing = true;
+                const btn = document.getElementById('myLocationBtn');
+                btn.innerHTML = '🛑 إيقاف المشاركة';
+                btn.classList.add('sharing');
+                alert('✅ تم بدء مشاركة موقعك مع المدير بشكل مستمر (كل 10 ثوانٍ)');
+                
+            }, err => {
+                alert('خطأ في تحديد الموقع: ' + err.message);
+            }, {enableHighAccuracy: true, timeout: 10000});
+        }
     }
     
-    // مشاركة الموقع المستمرة
     async function sendLocationToServer(lat, lng) {
         try {
             const url = `${SCRIPT_URL}?action=updateLocation&teamToken=${currentTeamToken}&lat=${lat}&lng=${lng}`;
             await fetch(url);
         } catch(e) { console.error('فشل إرسال الموقع:', e); }
-    }
-    
-    function startSharing() {
-        if (!navigator.geolocation) {
-            alert("المتصفح لا يدعم تحديد الموقع");
-            return;
-        }
-        if (shareInterval) clearInterval(shareInterval);
-        
-        // إرسال الموقع فوراً ثم كل 10 ثوانٍ
-        navigator.geolocation.getCurrentPosition(pos => {
-            sendLocationToServer(pos.coords.latitude, pos.coords.longitude);
-        });
-        
-        shareInterval = setInterval(() => {
-            navigator.geolocation.getCurrentPosition(pos => {
-                sendLocationToServer(pos.coords.latitude, pos.coords.longitude);
-            }, err => console.error('خطأ في تحديد الموقع:', err), {enableHighAccuracy: true});
-        }, 10000);
-        
-        isSharing = true;
-        const btn = document.getElementById('shareLocationBtn');
-        btn.innerHTML = '🛑 إيقاف المشاركة';
-        btn.classList.add('sharing');
-        alert('✅ تم بدء مشاركة موقعك مع المدير بشكل مستمر (كل 10 ثوانٍ)');
-    }
-    
-    function stopSharing() {
-        if (shareInterval) {
-            clearInterval(shareInterval);
-            shareInterval = null;
-        }
-        isSharing = false;
-        const btn = document.getElementById('shareLocationBtn');
-        btn.innerHTML = '📡 مشاركة موقعي المستمرة';
-        btn.classList.remove('sharing');
-        alert('⏹️ تم إيقاف مشاركة الموقع');
-    }
-    
-    function toggleSharing() {
-        if (isSharing) {
-            stopSharing();
-        } else {
-            startSharing();
-        }
     }
     
     function initMap() { 
@@ -169,8 +178,7 @@
         currentTileLayer.addTo(map); 
         markersLayer = L.layerGroup().addTo(map); 
         document.querySelectorAll('.layer-control button').forEach(btn => btn.addEventListener('click', () => switchLayer(btn.dataset.layer))); 
-        document.getElementById('myLocationBtn').addEventListener('click', showMyLocation);
-        document.getElementById('shareLocationBtn').addEventListener('click', toggleSharing);
+        document.getElementById('myLocationBtn').addEventListener('click', handleMyLocation);
     }
     
     function createBalloonIcon(meter) { const bgColor = getColorFromAction(meter.action); const html = `<div class="balloon-marker"><div class="pin" style="background-color: ${bgColor};"><div class="number">${meter.meterId.length > 4 ? meter.meterId.slice(0,4) : meter.meterId}</div></div></div>`; return L.divIcon({ className: 'balloon-marker-container', html: html, iconSize: [36,36], iconAnchor: [18,32], popupAnchor: [0,-32] }); }
