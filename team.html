@@ -76,7 +76,7 @@
     </div>
     <button class="my-location-btn" id="myLocationBtn">📍 موقعي الحالي</button>
 </div>
-<div class="info-panel">🧭 اضغط على عداد، أدخل رقم المخالفة (اختياري)، ثم اضغط "تم الإنجاز"<br>📍 الضغط على زر الموقع يشارك موقعك مع المدير بشكل مستمر (يظهر الزر باللون الأحمر عند المشاركة)</div>
+<div class="info-panel">🧭 اضغط على عداد، أدخل رقم المخالفة (اختياري)، ثم اضغط "تم الإنجاز"<br>📍</div>
 
 <script>
     const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwgqvLQcWxfaVCkvVozWQRnxCByEoRJvppSdgjjG98NQ0SPrxi7ihfbeHnQlOPoYpbe/exec';
@@ -117,7 +117,7 @@
             const btn = document.getElementById('myLocationBtn');
             btn.innerHTML = '📍 موقعي الحالي';
             btn.classList.remove('sharing');
-            alert('⏹️ تم إيقاف مشاركة الموقع مع المدير');
+            alert(');
         } else {
             // بدء المشاركة وعرض الموقع الحالي
             navigator.geolocation.getCurrentPosition(pos => {
@@ -128,7 +128,7 @@
                 if (currentLocationMarker) map.removeLayer(currentLocationMarker);
                 if (currentLocationCircle) map.removeLayer(currentLocationCircle);
                 const icon = L.divIcon({className:'current-location-marker', iconSize:[16,16], popupAnchor:[0,-8]});
-                currentLocationMarker = L.marker([lat,lng], {icon:icon}).addTo(map).bindPopup("📍 أنت هنا (تتم المشاركة)").openPopup();
+                currentLocationMarker = L.marker([lat,lng], {icon:icon}).addTo(map).bindPopup("📍 أنت هنا ").openPopup();
                 currentLocationCircle = L.circle([lat,lng], {radius:30, color:'#4285F4', fillColor:'#4285F4', fillOpacity:0.2, weight:1}).addTo(map);
                 map.setView([lat,lng], 15);
                 
