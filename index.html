@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>مدير النظام - إدارة العدادات والمخالفات</title>
+    <title>مدير النظام - تتبع مواقع الفرق</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
@@ -21,6 +21,7 @@
         .map-container { height: 400px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #ddd; position: relative; }
         .teams-table { background: white; border-radius: 12px; overflow-x: auto; padding: 15px; margin-bottom: 20px; }
         .history-table { background: white; border-radius: 12px; overflow-x: auto; padding: 15px; margin-bottom: 20px; max-height: 300px; overflow-y: auto; }
+        .locations-table { background: white; border-radius: 12px; overflow-x: auto; padding: 15px; margin-bottom: 20px; max-height: 200px; overflow-y: auto; }
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 12px; text-align: center; border-bottom: 1px solid #eee; }
         th { background: #34495e; color: white; }
@@ -43,6 +44,7 @@
         .my-location-btn { position: absolute; bottom: 20px; right: 10px; background: #fff; padding: 8px 12px; border-radius: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); z-index: 1000; cursor: pointer; font-size: 14px; font-weight: bold; border: none; background-color: #3498db; color: white; display: flex; align-items: center; gap: 5px; }
         .my-location-btn:hover { background-color: #2980b9; }
         .current-location-marker { background: #4285F4; border: 2px solid white; border-radius: 50%; width: 16px; height: 16px; box-shadow: 0 0 8px rgba(0,0,0,0.3); }
+        .team-location-marker { background: #e74c3c; border: 2px solid white; border-radius: 50%; width: 12px; height: 12px; box-shadow: 0 0 4px rgba(0,0,0,0.3); }
         .current-location-pulse { border-radius: 50%; width: 40px; height: 40px; background: rgba(66, 133, 244, 0.3); animation: pulse 1.5s infinite; }
         @keyframes pulse { 0% { transform: scale(0.5); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
     </style>
@@ -50,11 +52,12 @@
 <body>
 <div class="container">
     <div class="header">
-        <h1>📊 مدير التوزيع الجغرافي (روابط ثابتة + مخالفات)</h1>
+        <h1>📊 مدير التوزيع الجغرافي (تتبع مواقع الفرق)</h1>
         <div>
             <button onclick="refreshData()">🔄 تحديث</button>
             <button onclick="exportToExcel()" style="background:#27ae60;">📎 Excel</button>
             <button onclick="refreshAllTokens()" style="background:#e67e22;">🔄 تجديد روابط الفرق</button>
+            <button onclick="refreshLocations()" style="background:#8e44ad;">📍 تحديث مواقع الفرق</button>
         </div>
     </div>
     
@@ -70,7 +73,7 @@
         <div id="fullMsg" style="margin-top:10px;"></div>
     </div>
     
-    <!-- قسم إضافة عدادات جديدة مع توزيع تلقائي -->
+    <!-- قسم إضافة عدادات جديدة -->
     <div class="upload-area">
         <h3>➕ إضافة عدادات جديدة (سيتم توزيعها على الفرق الحالية تلقائياً)</h3>
         <div class="upload-form">
@@ -92,7 +95,7 @@
         <div class="map-container" id="searchMap" style="height:300px; display:none;"></div>
     </div>
     
-    <!-- الخريطة والإحصائيات -->
+    <!-- الخريطة الرئيسية -->
     <div class="stats-cards" id="statsCards"></div>
     <div class="map-container" id="managerMap">
         <div class="layer-control" id="layerControl">
@@ -103,18 +106,28 @@
         <button class="my-location-btn" id="myLocationBtn">📍 موقعي الحالي</button>
     </div>
     
+    <!-- جدول الفرق -->
     <div class="teams-table">
-        <h3>📋 الفرق والروابط (روابط ثابتة لا تنتهي)</h3>
+        <h3>📋 الفرق والروابط (روابط ثابتة)</h3>
         <table id="teamsTable"><thead>汽<th>الفرقة</th><th>العدادات</th><th>تم</th><th>متبقي</th><th>الرابط</th></thead><tbody></tbody></table>
     </div>
     
+    <!-- جدول مواقع الفرق -->
+    <div class="locations-table">
+        <h3>📍 آخر مواقع الفرق (مشاركة مستمرة)</h3>
+        <table id="locationsTable">
+            <thead>汽<th>الفريق</th><th>خط العرض</th><th>خط الطول</th><th>آخر تحديث</th></thead>
+            <tbody></tbody>
+        </table>
+    </div>
+    
     <div class="log-area" id="logArea">📋 سجل العمليات...</div>
-    <div class="footer">✅ الروابط ثابتة ولا تنتهي | يمكن للفني تسجيل رقم المخالفة عند إتمام العداد</div>
+    <div class="footer">✅ الفرق تشارك مواقعها تلقائياً عند الضغط على زر "موقعي الحالي"</div>
 </div>
 
 <script>
-    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxRvJ6h09Ko8ayVcko48GtlAp9axzyoQlx7jWWXuU2DPOxGwU0Y_hTE9GX5Igv1A5tv/exec';
-    let map, markersLayer, polygonLayer, currentTileLayer = null;
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwgqvLQcWxfaVCkvVozWQRnxCByEoRJvppSdgjjG98NQ0SPrxi7ihfbeHnQlOPoYpbe/exec';
+    let map, markersLayer, polygonLayer, teamLocationsLayer, currentTileLayer = null;
     let currentLocationMarker = null, currentLocationCircle = null;
     let searchMap = null, searchMarker = null;
     
@@ -132,7 +145,7 @@
     };
     function switchLayer(layerName) { if (currentTileLayer) map.removeLayer(currentTileLayer); currentTileLayer = tileLayers[layerName]; currentTileLayer.addTo(map); document.querySelectorAll('.layer-control button').forEach(btn => { if (btn.dataset.layer === layerName) btn.classList.add('active'); else btn.classList.remove('active'); }); }
     function showMyLocation() { if (!navigator.geolocation) { alert("المتصفح لا يدعم تحديد الموقع"); return; } navigator.geolocation.getCurrentPosition(pos => { const lat=pos.coords.latitude, lng=pos.coords.longitude; if(currentLocationMarker) map.removeLayer(currentLocationMarker); if(currentLocationCircle) map.removeLayer(currentLocationCircle); const icon = L.divIcon({className:'current-location-marker', iconSize:[16,16], popupAnchor:[0,-8]}); currentLocationMarker = L.marker([lat,lng],{icon:icon}).addTo(map).bindPopup("📍 أنت هنا").openPopup(); currentLocationCircle = L.circle([lat,lng], {radius:30, color:'#4285F4', fillColor:'#4285F4', fillOpacity:0.2, weight:1}).addTo(map); map.setView([lat,lng],15); }, err => alert(err.message), {enableHighAccuracy:true, timeout:10000}); }
-    function initMap() { map = L.map('managerMap').setView([27.545,41.712],12); currentTileLayer = tileLayers.street; currentTileLayer.addTo(map); markersLayer = L.layerGroup().addTo(map); polygonLayer = L.layerGroup().addTo(map); document.querySelectorAll('.layer-control button').forEach(btn => btn.addEventListener('click', () => switchLayer(btn.dataset.layer))); document.getElementById('myLocationBtn').addEventListener('click', showMyLocation); }
+    function initMap() { map = L.map('managerMap').setView([27.545,41.712],12); currentTileLayer = tileLayers.street; currentTileLayer.addTo(map); markersLayer = L.layerGroup().addTo(map); polygonLayer = L.layerGroup().addTo(map); teamLocationsLayer = L.layerGroup().addTo(map); document.querySelectorAll('.layer-control button').forEach(btn => btn.addEventListener('click', () => switchLayer(btn.dataset.layer))); document.getElementById('myLocationBtn').addEventListener('click', showMyLocation); }
     
     function log(msg) { const logDiv = document.getElementById('logArea'); logDiv.innerHTML += `<div>[${new Date().toLocaleTimeString()}] ${msg}</div>`; logDiv.scrollTop = logDiv.scrollHeight; console.log(msg); }
     
@@ -296,7 +309,40 @@
     function updateMap(teams, meters) { markersLayer.clearLayers(); polygonLayer.clearLayers(); for (let t of teams) if (t.polygonCoords?.length>2) { const latlngs = t.polygonCoords.map(p=>[p.lat,p.lng]); L.polygon(latlngs, { color:'#2c3e50', weight:2, fillColor:'#3498db', fillOpacity:0.1 }).addTo(polygonLayer); } for (let m of meters) { const icon = createBalloonIcon(m); L.marker([m.lat,m.lng], { icon:icon }).addTo(markersLayer).bindPopup(buildPopupContent(m)); } }
     function updateStats(teams, meters) { const total=meters.length, completed=meters.filter(m=>m.status==='completed').length; document.getElementById('statsCards').innerHTML = `<div class="card"><h3>${total}</h3><p>إجمالي</p></div><div class="card"><h3 style="color:#2ecc71">${completed}</h3><p>تم</p></div><div class="card"><h3 style="color:#e67e22">${total-completed}</h3><p>متبقي</p></div><div class="card"><h3>${teams.length}</h3><p>الفرق</p></div>`; }
     function updateTeamsTable(teams, meters) { const tbody = document.querySelector('#teamsTable tbody'); tbody.innerHTML = ''; const baseUrl = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1); for (let team of teams) { const teamMeters = meters.filter(m => m.teamId === team.id); const completed = teamMeters.filter(m => m.status === 'completed').length; const link = `${baseUrl}team.html?token=${team.token}`; const row = tbody.insertRow(); row.insertCell(0).innerText = team.name; row.insertCell(1).innerText = teamMeters.length; row.insertCell(2).innerHTML = `<span class="completed">${completed}</span>`; row.insertCell(3).innerHTML = `<span class="pending">${teamMeters.length-completed}</span>`; row.insertCell(4).innerHTML = `<a href="${link}" target="_blank" class="team-link">🔗 رابط الفريق</a> <span class="copy-btn" onclick="navigator.clipboard.writeText('${link}'); alert('تم نسخ الرابط')">📋 نسخ</span>`; } }
-    async function refreshData() { const data = await loadFromGoogleSheets(); if (data?.teams && data?.meters) { updateMap(data.teams, data.meters); updateStats(data.teams, data.meters); updateTeamsTable(data.teams, data.meters); } else log('⚠️ لا توجد بيانات'); }
+    
+    // عرض مواقع الفرق
+    async function updateLocations() {
+        try {
+            const res = await fetch(`${SCRIPT_URL}?action=getTeamLocations`);
+            const data = await res.json();
+            if (data.locations && data.locations.length > 0) {
+                // تحديث جدول المواقع
+                const tbody = document.querySelector('#locationsTable tbody');
+                tbody.innerHTML = '';
+                const latestLocations = new Map();
+                for (let loc of data.locations) {
+                    latestLocations.set(loc.teamId, loc);
+                }
+                for (let [teamId, loc] of latestLocations.entries()) {
+                    const row = tbody.insertRow();
+                    row.insertCell(0).innerText = loc.teamName || teamId;
+                    row.insertCell(1).innerText = loc.lat;
+                    row.insertCell(2).innerText = loc.lng;
+                    row.insertCell(3).innerText = new Date(loc.timestamp).toLocaleString();
+                }
+                // تحديث الخريطة
+                teamLocationsLayer.clearLayers();
+                for (let [teamId, loc] of latestLocations.entries()) {
+                    const icon = L.divIcon({ className: 'team-location-marker', iconSize: [12,12], popupAnchor: [0,-8] });
+                    L.marker([loc.lat, loc.lng], { icon: icon }).addTo(teamLocationsLayer)
+                        .bindPopup(`<b>${loc.teamName || teamId}</b><br>آخر موقع: ${new Date(loc.timestamp).toLocaleString()}`);
+                }
+            }
+        } catch(e) { log('⚠️ فشل تحميل مواقع الفرق'); }
+    }
+    
+    async function refreshData() { const data = await loadFromGoogleSheets(); if (data?.teams && data?.meters) { updateMap(data.teams, data.meters); updateStats(data.teams, data.meters); updateTeamsTable(data.teams, data.meters); } else log('⚠️ لا توجد بيانات'); updateLocations(); }
+    async function refreshLocations() { await updateLocations(); }
     
     async function fullReplace() {
         const csvFile = document.getElementById('fullCsvFile').files[0];
@@ -384,7 +430,7 @@
             let html = `<h4>📋 تاريخ العداد ${meterId}</h4><table><thead>汽<th>الورقة</th><th>خط العرض</th><th>خط الطول</th><th>الإجراء</th><th>الحالة</th><th>وقت الإنجاز</th><th>الفريق</th><th>رقم المخالفة</th><th>بيانات إضافية</th><th>تاريخ الأرشفة</th></thead><tbody>`;
             let lastCoords = null;
             for (let rec of history) {
-                html += `<tr><td>${rec.sheet}</td><td>${rec.lat||'—'}</td><td>${rec.lng||'—'}</td><td>${rec.action||'—'}</td><td>${rec.status==='completed'?'تم':(rec.status==='pending'?'قيد':rec.status)}</td><td>${rec.completedAt?new Date(rec.completedAt).toLocaleString():'—'}</td><td>${rec.teamId||'—'}</td><td>${rec.violationNumber||'—'}</td><td>${Object.entries(rec.extra||{}).map(([k,v])=>`${k}:${v}`).join(', ')}</td><td>${rec.archiveTimestamp?new Date(rec.archiveTimestamp).toLocaleString():'—'}</td><tr>`;
+                html += `<tr><td>${rec.sheet}</td><td>${rec.lat||'—'}</td><td>${rec.lng||'—'}</td><td>${rec.action||'—'}</td><td>${rec.status==='completed'?'تم':(rec.status==='pending'?'قيد':rec.status)}</td><td>${rec.completedAt?new Date(rec.completedAt).toLocaleString():'—'}</td><td>${rec.teamId||'—'}</td><td>${rec.violationNumber||'—'}</td><td>${Object.entries(rec.extra||{}).map(([k,v])=>`${k}:${v}`).join(', ')}</td><td>${rec.archiveTimestamp?new Date(rec.archiveTimestamp).toLocaleString():'—'}</td></tr>`;
                 if (rec.lat && rec.lng && !isNaN(rec.lat) && !isNaN(rec.lng)) lastCoords = { lat: rec.lat, lng: rec.lng };
             }
             html += `</tbody></table>`;
@@ -405,7 +451,8 @@
     initMap();
     refreshData();
     setInterval(refreshData, 10000);
-    window.fullReplace = fullReplace; window.appendOnly = appendOnly; window.searchMeterHistory = searchMeterHistory;
+    setInterval(updateLocations, 15000);
+    window.fullReplace = fullReplace; window.appendOnly = appendOnly; window.searchMeterHistory = searchMeterHistory; window.refreshLocations = refreshLocations;
 </script>
 </body>
 </html>
