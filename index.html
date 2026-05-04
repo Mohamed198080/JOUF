@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>مدير النظام - إضافة/استبدال</title>
+    <title>مدير النظام - إدارة العدادات والمخالفات</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
@@ -50,7 +50,7 @@
 <body>
 <div class="container">
     <div class="header">
-        <h1>📊 مدير التوزيع الجغرافي (إضافة / استبدال)</h1>
+        <h1>📊 مدير التوزيع الجغرافي (روابط ثابتة + مخالفات)</h1>
         <div>
             <button onclick="refreshData()">🔄 تحديث</button>
             <button onclick="exportToExcel()" style="background:#27ae60;">📎 Excel</button>
@@ -58,7 +58,7 @@
         </div>
     </div>
     
-    <!-- قسم استبدال كامل (رفع CSV + KML) -->
+    <!-- قسم استبدال كامل -->
     <div class="upload-area">
         <h3>🔄 استبدال كامل (أرشفة القديم + توزيع جديد)</h3>
         <div class="upload-form">
@@ -70,12 +70,12 @@
         <div id="fullMsg" style="margin-top:10px;"></div>
     </div>
     
-    <!-- قسم إضافة عدادات جديدة (رفع CSV فقط، بدون تغيير الفرق) -->
+    <!-- قسم إضافة عدادات جديدة مع توزيع تلقائي -->
     <div class="upload-area">
-        <h3>➕ إضافة عدادات جديدة (دمج مع الحالي، بدون تغيير المناطق)</h3>
+        <h3>➕ إضافة عدادات جديدة (سيتم توزيعها على الفرق الحالية تلقائياً)</h3>
         <div class="upload-form">
-            <div class="form-group"><label>ملف CSV/Excel (عدادات جديدة فقط):</label><input type="file" id="appendCsvFile" accept=".csv,.xlsx"></div>
-            <button onclick="appendOnly()">➕ إضافة إلى الحالي (بدون KML)</button>
+            <div class="form-group"><label>ملف CSV/Excel (عدادات جديدة):</label><input type="file" id="appendCsvFile" accept=".csv,.xlsx"></div>
+            <button onclick="appendOnly()">➕ إضافة وتوزيع</button>
         </div>
         <div id="appendMsg" style="margin-top:10px;"></div>
     </div>
@@ -104,16 +104,16 @@
     </div>
     
     <div class="teams-table">
-        <h3>📋 الفرق والروابط</h3>
-        <table id="teamsTable"><thead>汽<th>الفرقة</th><th>العدادات</th><th>تم</th><th>متبقي</th><th>الرابط</th><th>الصلاحية</th></thead><tbody></tbody></table>
+        <h3>📋 الفرق والروابط (روابط ثابتة لا تنتهي)</h3>
+        <table id="teamsTable"><thead>汽<th>الفرقة</th><th>العدادات</th><th>تم</th><th>متبقي</th><th>الرابط</th></thead><tbody></tbody></table>
     </div>
     
     <div class="log-area" id="logArea">📋 سجل العمليات...</div>
-    <div class="footer">✅ زر الاستبدال: يحذف القديم بالأرشيف ويوزع الجديد. زر الإضافة: يدمج العدادات الجديدة مع الحالي دون تغيير الفرق.</div>
+    <div class="footer">✅ الروابط ثابتة ولا تنتهي | يمكن للفني تسجيل رقم المخالفة عند إتمام العداد</div>
 </div>
 
 <script>
-    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxjbSntZnR9oZZnSAjww5DxHhcVDn0FyGO3TmrvmeO64QX__ePNfOhh7Nq4k-SLe5fu/exec';
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxRvJ6h09Ko8ayVcko48GtlAp9axzyoQlx7jWWXuU2DPOxGwU0Y_hTE9GX5Igv1A5tv/exec';
     let map, markersLayer, polygonLayer, currentTileLayer = null;
     let currentLocationMarker = null, currentLocationCircle = null;
     let searchMap = null, searchMarker = null;
@@ -197,6 +197,7 @@
                                 lat, lng,
                                 action: actionRaw || 'unknown',
                                 status: 'pending', completedAt: null, teamId: null,
+                                violationNumber: '',
                                 extra: extra
                             });
                         }
@@ -238,6 +239,7 @@
                                 meterId, lat, lng,
                                 action: actionRaw || 'unknown',
                                 status: 'pending', completedAt: null, teamId: null,
+                                violationNumber: '',
                                 extra: extra
                             });
                         }
@@ -286,17 +288,16 @@
     }
     function parseKMLCoords(coordStr, swap) { return coordStr.trim().split(/\s+/).map(p => { let [lng, lat] = p.split(',').map(Number); if (swap) [lat, lng] = [lng, lat]; return { lat, lng }; }).filter(p => !isNaN(p.lat) && !isNaN(p.lng)); }
     function isPointInPolygon(point, polygon) { let x=point.lng, y=point.lat, inside=false; for (let i=0,j=polygon.length-1; i<polygon.length; j=i++) { let xi=polygon[i].lng, yi=polygon[i].lat, xj=polygon[j].lng, yj=polygon[j].lat; let intersect = ((yi>y)!=(yj>y)) && (x < (xj-xi)*(y-yi)/(yj-yi)+xi); if (intersect) inside=!inside; } return inside; }
-    function assignMetersToTeams(meters, polygons) { let teams = polygons.map((p,i) => ({ id: crypto.randomUUID(), token: Math.random().toString(36).substring(2,12), name: p.name || `الفرقة ${i+1}`, polygonCoords: p.coords, meterIds: [] })); let assigned=0; for (let m of meters) { let found=false; for (let t of teams) { if (isPointInPolygon({lat:m.lat, lng:m.lng}, t.polygonCoords)) { t.meterIds.push(m.id); m.teamId=t.id; assigned++; found=true; break; } } if (!found) { let def = teams.find(t=>t.name==='خارج المناطق'); if (!def) { def = { id:crypto.randomUUID(), token:Math.random().toString(36).substring(2,12), name:'خارج المناطق', polygonCoords:[], meterIds:[] }; teams.push(def); } def.meterIds.push(m.id); m.teamId = def.id; } } teams = teams.filter(t=>t.meterIds.length>0); return { teams, meters }; }
+    function assignMetersToTeams(meters, polygons) { let teams = polygons.map((p,i) => ({ id: crypto.randomUUID(), token: Math.random().toString(36).substring(2,12), name: p.name || `الفرقة ${i+1}`, polygonCoords: p.coords, meterIds: [] })); let assigned=0; for (let m of meters) { m.violationNumber = ''; let found=false; for (let t of teams) { if (isPointInPolygon({lat:m.lat, lng:m.lng}, t.polygonCoords)) { t.meterIds.push(m.id); m.teamId=t.id; assigned++; found=true; break; } } if (!found) { let def = teams.find(t=>t.name==='خارج المناطق'); if (!def) { def = { id:crypto.randomUUID(), token:Math.random().toString(36).substring(2,12), name:'خارج المناطق', polygonCoords:[], meterIds:[] }; teams.push(def); } def.meterIds.push(m.id); m.teamId = def.id; } } teams = teams.filter(t=>t.meterIds.length>0); return { teams, meters }; }
     async function loadFromGoogleSheets() { try { const res = await fetch(`${SCRIPT_URL}?action=getManagerData`); if (!res.ok) throw new Error(`HTTP ${res.status}`); return await res.json(); } catch(e) { log('⚠️ فشل التحميل: '+e.message); return null; } }
     
     function createBalloonIcon(meter) { const bgColor = (meter.status === 'completed') ? '#7f8c8d' : getColorFromAction(meter.action, meter.status); const html = `<div class="balloon-marker"><div class="pin" style="background-color: ${bgColor};"><div class="number">${meter.meterId.length > 4 ? meter.meterId.slice(0,4) : meter.meterId}</div></div></div>`; return L.divIcon({ className: 'balloon-marker-container', html: html, iconSize: [36,36], iconAnchor: [18,32], popupAnchor: [0,-32] }); }
-    function buildPopupContent(meter) { let actionText = meter.action || 'غير معروف'; let extraHtml = ''; if (meter.extra && Object.keys(meter.extra).length) { extraHtml = '<hr><div style="text-align:right; font-size:11px;">📌 بيانات إضافية:<br>'; for (let [k,v] of Object.entries(meter.extra)) if(v) extraHtml += `<span style="font-weight:bold;">${k}:</span> ${v}<br>`; extraHtml += '</div>'; } return `<div style="text-align:center; min-width:200px;"><b>🚦 العداد: ${meter.meterId}</b><br>📋 الإجراء: ${actionText}<br>📍 الحالة: ${meter.status==='completed'?'✅ تم':'⏳ قيد'}<br>${extraHtml}${meter.completedAt ? '🕒 وقت الإنجاز: '+new Date(meter.completedAt).toLocaleString()+'<br>' : ''}<button onclick="window.open('https://www.google.com/maps/dir/?api=1&destination=${meter.lat},${meter.lng}')" style="margin-top:5px;">🧭 التنقل</button></div>`; }
+    function buildPopupContent(meter) { let actionText = meter.action || 'غير معروف'; let extraHtml = ''; if (meter.extra && Object.keys(meter.extra).length) { extraHtml = '<hr><div style="text-align:right; font-size:11px;">📌 بيانات إضافية:<br>'; for (let [k,v] of Object.entries(meter.extra)) if(v) extraHtml += `<span style="font-weight:bold;">${k}:</span> ${v}<br>`; extraHtml += '</div>'; } return `<div style="text-align:center; min-width:200px;"><b>🚦 العداد: ${meter.meterId}</b><br>📋 الإجراء: ${actionText}<br>📍 الحالة: ${meter.status==='completed'?'✅ تم':'⏳ قيد'}<br>${extraHtml}${meter.completedAt ? '🕒 وقت الإنجاز: '+new Date(meter.completedAt).toLocaleString()+'<br>' : ''}${meter.violationNumber ? '📝 رقم المخالفة: '+meter.violationNumber+'<br>' : ''}<button onclick="window.open('https://www.google.com/maps/dir/?api=1&destination=${meter.lat},${meter.lng}')" style="margin-top:5px;">🧭 التنقل</button></div>`; }
     function updateMap(teams, meters) { markersLayer.clearLayers(); polygonLayer.clearLayers(); for (let t of teams) if (t.polygonCoords?.length>2) { const latlngs = t.polygonCoords.map(p=>[p.lat,p.lng]); L.polygon(latlngs, { color:'#2c3e50', weight:2, fillColor:'#3498db', fillOpacity:0.1 }).addTo(polygonLayer); } for (let m of meters) { const icon = createBalloonIcon(m); L.marker([m.lat,m.lng], { icon:icon }).addTo(markersLayer).bindPopup(buildPopupContent(m)); } }
     function updateStats(teams, meters) { const total=meters.length, completed=meters.filter(m=>m.status==='completed').length; document.getElementById('statsCards').innerHTML = `<div class="card"><h3>${total}</h3><p>إجمالي</p></div><div class="card"><h3 style="color:#2ecc71">${completed}</h3><p>تم</p></div><div class="card"><h3 style="color:#e67e22">${total-completed}</h3><p>متبقي</p></div><div class="card"><h3>${teams.length}</h3><p>الفرق</p></div>`; }
-    function updateTeamsTable(teams, meters) { const tbody = document.querySelector('#teamsTable tbody'); tbody.innerHTML = ''; const baseUrl = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1); for (let team of teams) { const teamMeters = meters.filter(m => m.teamId === team.id); const completed = teamMeters.filter(m => m.status === 'completed').length; const link = `${baseUrl}team.html?token=${team.token}`; let expiryHtml = ''; if (team.tokenExpiry) { const expiryDate = new Date(team.tokenExpiry); const valid = expiryDate > new Date(); expiryHtml = `<span style="background:${valid?'#2ecc71':'#e74c3c'}; color:white; padding:2px 8px; border-radius:20px; font-size:11px;">${valid?'صالحة حتى':'منتهية'} ${expiryDate.toLocaleString()}</span>`; } const row = tbody.insertRow(); row.insertCell(0).innerText = team.name; row.insertCell(1).innerText = teamMeters.length; row.insertCell(2).innerHTML = `<span class="completed">${completed}</span>`; row.insertCell(3).innerHTML = `<span class="pending">${teamMeters.length-completed}</span>`; row.insertCell(4).innerHTML = `<a href="${link}" target="_blank" class="team-link">🔗 رابط الفريق</a> <span class="copy-btn" onclick="navigator.clipboard.writeText('${link}'); alert('تم نسخ الرابط')">📋 نسخ</span>`; row.insertCell(5).innerHTML = expiryHtml; } }
+    function updateTeamsTable(teams, meters) { const tbody = document.querySelector('#teamsTable tbody'); tbody.innerHTML = ''; const baseUrl = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1); for (let team of teams) { const teamMeters = meters.filter(m => m.teamId === team.id); const completed = teamMeters.filter(m => m.status === 'completed').length; const link = `${baseUrl}team.html?token=${team.token}`; const row = tbody.insertRow(); row.insertCell(0).innerText = team.name; row.insertCell(1).innerText = teamMeters.length; row.insertCell(2).innerHTML = `<span class="completed">${completed}</span>`; row.insertCell(3).innerHTML = `<span class="pending">${teamMeters.length-completed}</span>`; row.insertCell(4).innerHTML = `<a href="${link}" target="_blank" class="team-link">🔗 رابط الفريق</a> <span class="copy-btn" onclick="navigator.clipboard.writeText('${link}'); alert('تم نسخ الرابط')">📋 نسخ</span>`; } }
     async function refreshData() { const data = await loadFromGoogleSheets(); if (data?.teams && data?.meters) { updateMap(data.teams, data.meters); updateStats(data.teams, data.meters); updateTeamsTable(data.teams, data.meters); } else log('⚠️ لا توجد بيانات'); }
     
-    // الاستبدال الكامل
     async function fullReplace() {
         const csvFile = document.getElementById('fullCsvFile').files[0];
         const kmlFile = document.getElementById('fullKmlFile').files[0];
@@ -318,22 +319,19 @@
         } catch(err) { msgDiv.innerHTML = `❌ ${err.message}`; log(err.message); }
     }
     
-    // إضافة عدادات جديدة فقط (دمج بسيط)
     async function appendOnly() {
         const csvFile = document.getElementById('appendCsvFile').files[0];
         if (!csvFile) { alert('اختر ملف CSV'); return; }
         const msgDiv = document.getElementById('appendMsg');
-        msgDiv.innerHTML = '⏳ جاري إضافة العدادات الجديدة...';
+        msgDiv.innerHTML = '⏳ جاري إضافة العدادات الجديدة وتوزيعها...';
         try {
             const newMeters = await parseCSVorExcel(csvFile);
             if (!newMeters.length) throw new Error('لا توجد عدادات صالحة');
-            // تعيين teamId فارغ (سيتم تجاهله، سيضاف بدون فريق)
-            for (let m of newMeters) m.teamId = '';
             const payload = new URLSearchParams({ action: 'appendMeters', metersJson: JSON.stringify(newMeters) }).toString();
             const res = await fetch(SCRIPT_URL, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:payload });
             const result = await res.json();
             if (result.addedCount !== undefined) {
-                msgDiv.innerHTML = `✅ تمت إضافة ${result.addedCount} عداد جديد (تم تجنب المكرر)`;
+                msgDiv.innerHTML = `✅ تمت إضافة وتوزيع ${result.addedCount} عداد جديد (تجنب المكرر)`;
                 refreshData();
             } else msgDiv.innerHTML = '❌ فشل الإضافة';
         } catch(err) { msgDiv.innerHTML = `❌ ${err.message}`; log(err.message); }
@@ -343,7 +341,7 @@
         const data = await loadFromGoogleSheets();
         if (!data?.meters) { alert('لا توجد بيانات'); return; }
         const rows = data.meters.map(m => {
-            let base = { 'رقم العداد': m.meterId, 'خط العرض': m.lat, 'خط الطول': m.lng, 'الإجراء': m.action, 'الحالة': m.status==='completed'?'تم':'قيد', 'وقت الإنجاز': m.completedAt||'', 'الفرقة': data.teams.find(t=>t.id===m.teamId)?.name||'' };
+            let base = { 'رقم العداد': m.meterId, 'خط العرض': m.lat, 'خط الطول': m.lng, 'الإجراء': m.action, 'الحالة': m.status==='completed'?'تم':'قيد', 'وقت الإنجاز': m.completedAt||'', 'رقم المخالفة': m.violationNumber||'', 'الفرقة': data.teams.find(t=>t.id===m.teamId)?.name||'' };
             if (m.extra) Object.assign(base, m.extra);
             return base;
         });
@@ -354,7 +352,7 @@
     }
     
     async function refreshAllTokens() {
-        if (!confirm('سيتم تجديد روابط الفرق لمدة 24 ساعة جديدة. هل تريد المتابعة؟')) return;
+        if (!confirm('سيتم تجديد روابط الفرق. هل تريد المتابعة؟')) return;
         try {
             const res = await fetch(`${SCRIPT_URL}?action=refreshAllTokens`);
             const result = await res.json();
@@ -383,10 +381,10 @@
                 return;
             }
             document.getElementById('searchResult').innerHTML = `<div style="color:green;">✅ تم العثور على ${history.length} سجل</div>`;
-            let html = `<h4>📋 تاريخ العداد ${meterId}</h4><tr><thead>汽<th>الورقة</th><th>خط العرض</th><th>خط الطول</th><th>الإجراء</th><th>الحالة</th><th>وقت الإنجاز</th><th>الفريق</th><th>بيانات إضافية</th><th>تاريخ الأرشفة</th></thead><tbody>`;
+            let html = `<h4>📋 تاريخ العداد ${meterId}</h4><table><thead>汽<th>الورقة</th><th>خط العرض</th><th>خط الطول</th><th>الإجراء</th><th>الحالة</th><th>وقت الإنجاز</th><th>الفريق</th><th>رقم المخالفة</th><th>بيانات إضافية</th><th>تاريخ الأرشفة</th></thead><tbody>`;
             let lastCoords = null;
             for (let rec of history) {
-                html += `<tr><td>${rec.sheet}</td><td>${rec.lat||'—'}</td><td>${rec.lng||'—'}</td><td>${rec.action||'—'}</td><td>${rec.status==='completed'?'تم':(rec.status==='pending'?'قيد':rec.status)}</td><td>${rec.completedAt?new Date(rec.completedAt).toLocaleString():'—'}</td><td>${rec.teamId||'—'}</td><td>${Object.entries(rec.extra||{}).map(([k,v])=>`${k}:${v}`).join(', ')}</td><td>${rec.archiveTimestamp?new Date(rec.archiveTimestamp).toLocaleString():'—'}</td></tr>`;
+                html += `<tr><td>${rec.sheet}</td><td>${rec.lat||'—'}</td><td>${rec.lng||'—'}</td><td>${rec.action||'—'}</td><td>${rec.status==='completed'?'تم':(rec.status==='pending'?'قيد':rec.status)}</td><td>${rec.completedAt?new Date(rec.completedAt).toLocaleString():'—'}</td><td>${rec.teamId||'—'}</td><td>${rec.violationNumber||'—'}</td><td>${Object.entries(rec.extra||{}).map(([k,v])=>`${k}:${v}`).join(', ')}</td><td>${rec.archiveTimestamp?new Date(rec.archiveTimestamp).toLocaleString():'—'}</td><tr>`;
                 if (rec.lat && rec.lng && !isNaN(rec.lat) && !isNaN(rec.lng)) lastCoords = { lat: rec.lat, lng: rec.lng };
             }
             html += `</tbody></table>`;
